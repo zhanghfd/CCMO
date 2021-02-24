@@ -1,0 +1,206 @@
+---
+title: "Introduction to CCMO"
+author: "Hong Zhang and Kai Zhang"
+date: "2021/02/24"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to CCMO}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+# 1. Methods
+
+The R package __CCMO__ implements two powerful statistical methods for disease-gene association analysis using case-control mother-offspring data.
+
+## 1.2 Data description
+
+The data for each mother-offspring pair are $(D,G^c,G^m,X)$, where $D$ is the disease status of the offspring (should be coded as 1 for case and 0 for control), $G^c$ and $G^m$ are the genotypes of offspring and mother, and $X$ is a $p$-vector of maternal covariates. 
+
+Suppose a SNP has two alleles A and B (B is the minor allele), then genotypes can be coded either as 0 (for genotype AA), 1 (for genotype AB), or 2 (for genotype BB). Alternatively, the genotypes can be normalized according to specified mode of inheritance
+\begin{itemize}
+\item Additive: 0 for AA, 1/2 for AB, and 1 for BB;
+\item Recessive: 0 for AA or AB, 1 for BB;
+\item Dominant: 0 for AA, 1 for AB or BB.
+\end{itemize}
+In what follows, we adopt the normalized genotypes.
+
+## 1.3 Testing maternal and offspring genetic effects and envirionment effects
+
+### 1.3.1 Reference
+
+Zhang H, Mukherjee B, Arthur V, Hu G, Hochner H, Chen J (2020). An Efficient and Computationally Robust Statistical Method for Analyzing Case-Control Mother-Offspring Pair Genetic Association Studies. *Annals of Applied Statistics* **14**: 560–-584.
+
+### 1.3.2 Model description
+
+The method assumes that the offspring genotype is conditionally independent of the maternal covariates given maternal covariates. The penetrance model is as follows:
+\begin{eqnarray*}
+&&\mbox{pr}(D=1|G^o,G^m,X)\\
+&=&\mbox{expit}(\beta_0+\beta_{G^c}G^c+\beta_{G^m}G^m+\beta_oX_o+\beta_{G^cX}G^cX_c+\beta_{G^mX}G^mX_m+\beta_{G^cG^m}G^cG^m),
+\end{eqnarray*}
+where expit$(t)=e^t/(1+e^t)$, $X_o$, $X_c$, and $X_m$ are functions of the covariates $X$, $\beta_{G^c}$ and $\beta_{G^m}$ are main genetic effects for offspring (child) and mother, respectively, $\beta_o$ is the main maternal environmental effect, $\beta_{G^cX}$ is the offspring gene-environment interaction effct, $\beta_{G^mX}$ is the maternal gene-environment interaction effect, and $\beta_{G^cG^m}$ is the gene-gene interaction effect. The maternal genotype is associated with the maternal covariates through the following double additive logit (daLOG) model:
+$$\mbox{pr}(G^m=1|X)=\frac{\xi(\theta,F)e^{k\eta'X_{G^m}}}{\sum_l\xi_l(\theta,F)e^{l\eta'X_{G^m}}},$$
+where $\eta$ is a regression parameter vector, $X_{G^m}$ is a function of $X$, $\xi_k(\theta,F)$ is the probability of $G^m=k$ with $\theta$ being the minor allele frequency and $F$ being the inbreeding coefficient. 
+
+### 1.3.4 Usage of main functions _singleSNP_ and _multipleSNP_
+
+\begin{description}
+\item singleSNP(Y, Gc, Gm, Xo = NULL, Xc = NULL, Xm = NULL, X.Gm = NULL,
+  G.main = c("Gc", "Gm"), G.int = FALSE, mode = "add", prev = 0.01,
+  ind = FALSE, HWE = TRUE, normalized.genotype = FALSE)
+
+\item multipleSNP(Y, Gc, Gm, Xo = NULL, Xc = NULL, Xm = NULL,
+  X.Gm = NULL, G.main = c("Gc", "Gm"), G.int = FALSE, mode = "add",
+  prev = 0.01, ind = FALSE, HWE = TRUE,
+  normalized.genotype = FALSE, test = NULL)
+\end{description}
+
+Users should specify $X_c$, $X_m$, $X_o$, $X_{G^m}$ according to their requirements, each of them can be omitted in the model by setting it to be the default value _NULL_. Each of the two main genetic effects can be included in the penetrance model by specifying _G.main_, and the gene-gene interaction effect can be included by setting _G.int_ to be _TRUE_. 
+
+The mode of inheritance can be specified through _mode_ ('rec' for recessive, 'add' for additive, 'dom' for dominant). Hardy-Weiberg equilibrium can be incorporated in the method through _HWE_. The independence of $G^m$ and $X$ can be incorprated by setting _ind_ to be _TRUE_. 
+
+
+## 1.4 Testing parent-of-origin effects
+
+### 1.4.1 Reference
+
+Zhang K, Zhang H, Chen J. (2021). Covariate Adjusted Inference of Parent-of-Origin Effects Using Case-Control Mother-Child Paired Multi-Locus Genotype Data. Manuscript.
+
+### 1.4.2 Model description
+
+The penetrance model for parent-of-origin effects (POEs) is as follows:
+\begin{eqnarray*}
+&&\mbox{pr}(D=1|G^c,G^m,G^c_m,G^c_p,X)\\
+&=&\mbox{expit}(\beta_0+\beta_{G^c}G^c+\beta_{G^m}G^m+\beta_{POE}(G^c_m-G^c_p)+\beta_{X}X),
+\end{eqnarray*}
+$\beta_{G^c}$ and $\beta_{G^m}$ are main genetic effects for offspring (child) and mother, respectively, $\beta_X$ is the main maternal environmental effect, $\beta_{POE}$ is the POE. The genotypes should be coded either as 0 (for genotype AA), 1 (for genotype AB), or 2 (for genotype BB) and we consider using haplotypes data to improve the inference efficiency for assessing POEs. In additional to multi-locus genotypes, disease statuses, and covariates, the inputs for the POE analysis function _MultiLociPOE_ shoud include possible haplotypes in the population of interest, which can be generated by the function _MultiLociPOE.input_. 
+
+### 1.4.3 Usage of main function _MultiLociPOE_
+
+The usage of the function _MultiLociPOE_ is as follows:
+
+\begin{description}
+\item MultiLociPOE(Y,gmm,gcc,X,loci,hap,f,ppi)
+\end{description}
+
+Users should specify test loci and prevalence \code{f}, and make sure that the genotypes are coded as 0 (for genotype AA), 1 (for genotype AB), or 2 (for genotype BB).
+
+\begin{description}
+\item MultiLociPOE.input(gmm,gcc,type)
+\end{description}
+
+Users can use _MultiLociPOE.input_ to generate inputs for _MultiLociPOE_. Users should specify _type_ corresponding to the format of the genotype data. Here, '0' means the genotypes are coded as 0, 1, 2; '1' means the genotypes are normalized as 0, 1/2, 1; '2' means the genotypes are coded as something like "A/A", "A/B", "B/B".
+
+# 2. Illustration of main functions
+
+## 2.1 _singleSNP_
+
+We use the dataset contained in the R package for illustration.
+```{r,eval=FALSE}
+library(CCMO)
+data("SampleData",package="CCMO")
+dim(SampleData)
+head(SampleData)
+```
+
+This dataset has maternal and offspring genotypes for 10 SNPs and two maternal covariates from 2000 mother-offspring pairs. Here we analyze the first SNP. Suppose we are interested in two main genetic effects, maternal gene-environment interaction effects, and offspring gene-environment interaction effects. The R code for analyzing the data is as follows:
+```{r,eval=FALSE}
+# library(CCMO)
+Y = SampleData[,1]
+Gc = SampleData[,2]
+Gm = SampleData[,12]
+X = SampleData[,-(1:21)]
+fit = singleSNP(Y,Gc,Gm,Xo=X,Xc=X,Xm=X,X.Gm=X)
+```
+
+The result is a list, whose elements can be accessed through
+```{r,eval=FALSE}
+names(fit)
+```
+
+The estimation and significance test results produced by the new method are  stored in
+```{r,eval=FALSE}
+fit$new
+```
+The covariance matrix of the estimates by the new method is stored in
+```{r,eval=FALSE}
+fit$cov.new
+```
+The corresponding results by the standard logistic regression are included for comparison
+```{r,eval=FALSE}
+fit$log
+fit$cov.log
+```
+
+## 2.2 _OmnibusTest_
+
+Multiple effects can be simultineously tested using the function _OmnibusTest_. Suppose we want to test four gene-environment interaction effects simultineously, then we should specify the indices of the two interaction effects when calling _OmnibusTest_: 
+```{r,eval=FALSE}
+fit = OmnibusTest(fit,test=7:10)
+fit$Omnibus
+```
+The results include the Wald test statistic, degrees of freedom, and p-value for each of two methods (i.e., _new_ and _log_).
+
+## 2.3 _multipleSNP_
+
+Suppose we want to analyze the 10 SNPs simultaneously. The function _multipleSNP_ calls multiple CPU cores to save computational time, as shown below
+```{r,eval=FALSE}
+Gc = SampleData[,2:11]
+Gm = SampleData[,12:21]
+system.time(fit1 <- multipleSNP(Y,Gc,Gm,Xo=X,Xc=X,Xm=X,X.Gm=X,cores=1))
+system.time(fit2 <- multipleSNP(Y,Gc,Gm,Xo=X,Xc=X,Xm=X,X.Gm=X,cores=2))
+```
+Of course, the saved computational time depends on the number of CPU cores. The output is a list of length 10 (the number of SNPs). For example, the results of the 2nd SNP can be accessed through
+```{r,eval=FALSE}
+fit2[[2]]
+```
+Omnibus test can be carried out by specifying the target variable indices through _test_:
+```{r,eval=FALSE}
+fit <- multipleSNP(Y,Gc,Gm,Xo=X,Xc=X,Xm=X,X.Gm=X,test=7:10)
+fit[[2]]$Omnibus
+```
+
+## 2.4 _MultiLociPOE_
+
+```{r,eval=FALSE}
+# library(CCMO)
+Y = POESampleData[,1]
+gmm = POESampleData[,2:6]
+gcc = POESampleData[,7:11]
+X = POESampleData[,12]
+data = MultiLociPOE.input(gmm,gcc,0)
+gmm = data$gmm
+gcc = data$gcc
+hap = data$hap
+ppi = data$ppi
+loci = 1
+f = 0.01
+fit = MultiLociPOE(Y,gmm,gcc,X,loci,hap,f,ppi)
+```
+
+The result is a list, whose elements can be accessed through
+```{r,eval=FALSE}
+names(fit)
+```
+
+The estimation and significance test results produced by the new method are stored in
+```{r,eval=FALSE}
+fit$new
+```
+The covariance matrix of the estimates by the new method is stored in
+```{r,eval=FALSE}
+fit$cov.new
+```
+The corresponding results by the standard logistic regression are included for comparison
+```{r,eval=FALSE}
+fit$log
+fit$cov.log
+```
+
+
+
+
+
+
+
+
