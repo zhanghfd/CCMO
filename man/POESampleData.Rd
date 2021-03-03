@@ -4,7 +4,7 @@
 \alias{POESampleData}
 \title{A sample dataset for POE}
 \description{
-This sample dataset for POE based five loci.
+This sample dataset includes genotypes for five tightly linked SNPs.
 }
 \examples{
 \dontrun{
