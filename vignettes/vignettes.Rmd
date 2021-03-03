@@ -64,7 +64,7 @@ The mode of inheritance can be specified through _mode_ ('rec' for recessive, 'a
 
 ### 1.4.1 Reference
 
-Zhang K, Zhang H, Chen J. (2021). Covariate Adjusted Inference of Parent-of-Origin Effects Using Case-Control Mother-Child Paired Multi-Locus Genotype Data. Manuscript.
+Zhang K, Zhang H, Hochner H, Chen J (2021). Covariate Adjusted Inference of Parent-of-Origin Effects Using Case-Control Mother-Child Paired Multi-Locus Genotype Data. Manuscript.
 
 ### 1.4.2 Model description
 

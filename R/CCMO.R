@@ -69,7 +69,7 @@ NULL
 
 #' @title A sample dataset for POE
 #' @name POESampleData
-#' @description This sample dataset for POE based five loci.
+#' @description This sample dataset includes genotypes for five tightly linked SNPs.
 #' @examples
 #' \dontrun{
 #' data(POESampleData)
@@ -322,10 +322,14 @@ OmnibusTest <- function(d,test){
 MultiLociPOE = function(Y,gmm,gcc,X,loci,hap,f,ppi){
 
   res = imprinting(Y,gmm,gcc,X,loci,hap,f,ppi)
-
+  
+  X = as.matrix(X)
+  ncol.X = ncol(X)
   est.new = res$est #estimated values of parameters
   cov.new = res$cov #covariance matrix of estimated parameters
-  names(est.new) = colnames(cov.new) = rownames(cov.new) = c('theta','Intercept','Gm','Gc','Gmc-Gpc','X','eta')
+  X.name = paste0('X',seq_len(ncol(X)))
+  eta.name = paste0('eta',seq_len(ncol(X)))
+  names(est.new) = colnames(cov.new) = rownames(cov.new) = c('theta','Intercept','Gm','Gc','Gmc-Gpc',X.name,eta.name)
   se.new = sqrt(diag(cov.new))
   z.new = est.new/se.new
   pval.new = 1-pchisq(z.new^2,1)
@@ -335,7 +339,7 @@ MultiLociPOE = function(Y,gmm,gcc,X,loci,hap,f,ppi){
 
   est.log = res$est.log
   cov.log = res$cov.log
-  names(est.log) = colnames(cov.log) = rownames(cov.log) = c('Intercept','Gm','Gc','Gmc-Gpc','X')
+  names(est.log) = colnames(cov.log) = rownames(cov.log) = c('Intercept','Gm','Gc','Gmc-Gpc',X.name)
   se.log = sqrt(diag(cov.log))
   z.log = est.log/se.log
   z.log = est.log/sqrt(diag(cov.log))
@@ -1809,8 +1813,10 @@ imprinting = function(Y,gmm,gcc,X,loci,hap,f,ppi){
   gcm.log = gcm[phi==1]
   gcp.log = gcp[phi==1]
   Y.log = Y[phi==1]
-  X.log = X[phi==1]
-
+  if(max(ncol(X),1)>1){
+    X.log = X[phi==1,]
+  } else X.log = X[phi==1]
+  
   Z = Im.design.matrix1(gm,gc,gcm,gcp,X)
   if(mean(phi==1)==1){
     Z1 = Z
@@ -2164,7 +2170,8 @@ Im.dalog.add = function(Gm,X,theta,eta){
   # additive mode: Gm = 0 or 1 or 2
   Gm1 = Gm + 1
   Gm = Gm/2
-  tmp = as.numeric(X*eta)
+  X = as.matrix(X)
+  tmp = as.numeric(X%*%eta)
   etmp.2 = exp(tmp/2)
   xi = Im.xi.add(theta)
   tmp0 = xi[Gm1]*exp(Gm*tmp)
@@ -2177,7 +2184,8 @@ Im.dalog.add = function(Gm,X,theta,eta){
 Im.dalog.gr.add = function(Gm,X,theta,eta){
   Gm1 = Gm + 1;
   Gm = Gm/2
-  tmp = as.numeric(X*eta);
+  X = as.matrix(X)
+  tmp = as.numeric(X%*%eta);
   xi = Im.xi.add(theta);
   xi.d = Im.xi.gr.add(theta);
 
@@ -2190,8 +2198,8 @@ Im.dalog.gr.add = function(Gm,X,theta,eta){
   tmp2 = xi[Gm1]*eGtmp;
 
   tmp3 = tmp1/tmp0 - (xi.d[1]+xi.d[2]*etmp.2 + xi.d[3]*etmp.1) * tmp2/tmp0^2;
-  tmp4 = X*(tmp2*Gm/tmp0 - tmp2/tmp0^2*(xi[2]*etmp.2/2 + xi[3]*etmp.1))
-
+  tmp4 = sweep(X,1,tmp2*Gm/tmp0 - tmp2/tmp0^2*(xi[2]*etmp.2/2 + xi[3]*etmp.1),'*')
+  
   return(cbind(tmp3,tmp4));
 }
 
@@ -2216,8 +2224,9 @@ Im.H.add = function(n.beta,Theta,X){
   theta = Theta[1]
   beta = Theta[2:(1+n.beta)]
   eta = Theta[-(1:(1+n.beta))]
-
-  n = length(X)
+  X = as.matrix(X)
+  
+  n = nrow(X)
   h = rep(0,n)
 
   #Pr(Gmc|Gm)
@@ -2247,8 +2256,9 @@ Im.H.gr.add = function(n.beta,Theta,X){
   theta = Theta[1]
   beta = Theta[2:(1+n.beta)]
   eta = Theta[-(1:(1+n.beta))]
-
-  n = length(X)
+  X = as.matrix(X)
+  
+  n = nrow(X)
   p = length(Theta)
 
   #Pr(Gmc|Gm)
@@ -2355,193 +2365,5 @@ Im.design.matrix2_2 = function(gm,gc,gcm,gcp,X,phi){
   gcp[-which(phi==1)] = 1
   cbind(1,gm,gc,gcm-gcp,X)
 }
-
-
-#main function
-
-imprinting = function(Y,gmm,gcc,X,loci,hap,f,ppi){
-
-  F = distinguish(gmm, gcc, loci, hap)
-  gm = F$gm
-  gc = F$gc
-  gcm = F$gcm
-  gcp = F$gcp
-  phi = F$phi
-
-  gm.log = gm[phi==1]
-  gc.log = gc[phi==1]
-  gcm.log = gcm[phi==1]
-  gcp.log = gcp[phi==1]
-  Y.log = Y[phi==1]
-  X.log = X[phi==1]
-
-  Z = Im.design.matrix1(gm,gc,gcm,gcp,X)
-  if(mean(phi==1)==1){
-    Z1 = Z
-    Z2 = Z
-    Pm = rep(1,length(Y))
-    Pp = rep(0,length(Y))
-  } else{
-    Z1 = Im.design.matrix2_1(gm,gc,gcm,gcp,X,phi)
-    Z2 = Im.design.matrix2_2(gm,gc,gcm,gcp,X,phi)
-    W = distinguish0(gmm[-which(phi==1),],gcc[-which(phi==1),],loci,hap,ppi)
-    Pm = rep(1,length(Y))
-    Pp = rep(0,length(Y))
-    Pm[-which(phi==1)] = W$Pm
-    Pp[-which(phi==1)] = W$Pp
-  }
-  P1 = Pm/(Pm+Pp)
-  P2 = Pp/(Pm+Pp)
-
-  Z.log = Im.design.matrix1(gm.log,gc.log,gcm.log,gcp.log,X.log)
-  fit = glm(Y.log ~ 0 + Z.log,family = binomial)
-  res = summary(fit)$coef
-  est.log = as.vector(res[,1])
-  cov.log = vcov(fit)
-  pval.log = as.vector(res[,4])
-
-  theta = 1-sqrt(mean(gm==0))
-  n.beta = ncol(Z) # number of all regression parameters in the penetrance model
-  n.eta = max(1,ncol(X)) # number of covariates possibly associated with Gm
-  theta0 = log(f/(1-f))
-  beta = rep(theta0,n.beta)
-  beta[-1] = est.log[-1]
-  Theta = c(theta,beta,rep(0,n.eta))
-  n = length(Y)
-  ns = c(sum(Y==1),sum(Y==0))
-  lambda = ns[1]/n/f - ns[2]/n/(1-f)
-  p = length(Theta)
-
-  II = list()
-  II[[1]] = which(Y==0)
-  II[[2]] = which(Y==1)
-
-  upper = lower = Theta
-  upper[1] = 0.99
-  lower[1] = 0.01
-  upper[-1] = Theta[-1] + 2
-  lower[-1] = Theta[-1] - 2
-
-  #number of (gc,gm)
-  m11 = sum(gc==0&gm==0)
-  m12 = sum(gc==0&gm==1)
-  m21 = sum(gc==1&gm==0)
-  m22 = sum(gc==1&gm==1)
-  m23 = sum(gc==1&gm==2)
-  m32 = sum(gc==2&gm==1)
-  m33 = sum(gc==2&gm==2)
-
-  #likelihood
-  fn.add = function(Theta){
-    theta=Theta[1]
-    beta = Theta[2:(1+n.beta)]
-    eta = Theta[-(1:(1+n.beta))]
-
-    tr = Im.tr.add(theta)
-    h.fn = Im.H.add(n.beta,Theta,X)
-
-    res = m11*log(tr[1,1])+m12*log(tr[1,2])+m21*log(tr[2,1])+m22*log(tr[2,2])+m23*log(tr[2,3])+m32*log(tr[3,2])+m33*log(tr[3,3])
-    res = res + sum(log(Im.dalog.add(gm,X,theta,eta)))
-    res = res + sum(log(P1*Im.penetrance1(Z1,Y,beta)+P2*Im.penetrance1(Z2,Y,beta)))
-    res = res - sum(log(1+lambda*(h.fn-f)))
-    return(-res);
-  }
-
-  #gradient
-  gr.add = function(Theta){
-    theta=Theta[1]
-    beta = Theta[2:(1+n.beta)]
-    eta = Theta[-(1:(1+n.beta))]
-
-    logq.gr = Im.tr.gr.add(theta)/Im.tr.add(theta)
-
-    logq.theta = rep(NA,n)
-    logq.theta[gc==0&gm==0] = logq.gr[1,1]
-    logq.theta[gc==1&gm==0] = logq.gr[2,1]
-    logq.theta[gc==0&gm==1] = logq.gr[1,2]
-    logq.theta[gc==1&gm==1] = logq.gr[2,2]
-    logq.theta[gc==2&gm==1] = logq.gr[3,2]
-    logq.theta[gc==1&gm==2] = logq.gr[2,3]
-    logq.theta[gc==2&gm==2] = logq.gr[3,3]
-
-
-    logr.gr = sweep(Im.dalog.gr.add(gm,X,theta,eta),1,Im.dalog.add(gm,X,theta,eta),'/')
-
-    logr.theta = logr.gr[,1]
-    logr.eta = logr.gr[,-1]
-
-    logp.gr1 = P1*Im.penetrance1.gr(Z1,Y,beta)/(P1*Im.penetrance1(Z1,Y,beta)+P2*Im.penetrance1(Z2,Y,beta))
-    logp.gr2 = P2*Im.penetrance1.gr(Z2,Y,beta)/(P1*Im.penetrance1(Z1,Y,beta)+P2*Im.penetrance1(Z2,Y,beta))
-    logp.beta = sweep(Z1,1,logp.gr1,'*') + sweep(Z2,1,logp.gr2,'*')
-
-    h.fn = Im.H.add(n.beta,Theta,X)
-    h.gr = Im.H.gr.add(n.beta,Theta,X)
-    others = sweep(lambda*h.gr,1,1+lambda*(h.fn-f),'/')
-
-    all = cbind(logq.theta+logr.theta,logp.beta,logr.eta) - others
-    -colSums(all)
-  }
-
-
-  fit = nloptr(x0=Theta,eval_f=fn.add,eval_grad_f=gr.add,lb=lower,ub=upper,opts=list("algorithm"="NLOPT_LD_LBFGS","xtol_rel"=1.0e-4) )
-  hess = hessian(func=fn.add,x=fit$solution)
-
-  est = fit$solution
-
-  #covariance
-  score.cov.add = function(Theta){
-
-    theta=Theta[1]
-    beta = Theta[2:(1+n.beta)]
-    eta = Theta[-(1:(1+n.beta))]
-
-    logq.gr = Im.tr.gr.add(theta)/Im.tr.add(theta)
-
-    logq.theta = rep(NA,n)
-    logq.theta[gc==0&gm==0] = logq.gr[1,1]
-    logq.theta[gc==1&gm==0] = logq.gr[2,1]
-    logq.theta[gc==0&gm==1] = logq.gr[1,2]
-    logq.theta[gc==1&gm==1] = logq.gr[2,2]
-    logq.theta[gc==2&gm==1] = logq.gr[3,2]
-    logq.theta[gc==1&gm==2] = logq.gr[2,3]
-    logq.theta[gc==2&gm==2] = logq.gr[3,3]
-
-
-    logr.gr = sweep(Im.dalog.gr.add(gm,X,theta,eta),1,Im.dalog.add(gm,X,theta,eta),'/')
-
-    logr.theta = logr.gr[,1]
-    logr.eta = logr.gr[,-1]
-
-    logp.gr1 = P1*Im.penetrance1.gr(Z1,Y,beta)/(P1*Im.penetrance1(Z1,Y,beta)+P2*Im.penetrance1(Z2,Y,beta))
-    logp.gr2 = P2*Im.penetrance1.gr(Z2,Y,beta)/(P1*Im.penetrance1(Z1,Y,beta)+P2*Im.penetrance1(Z2,Y,beta))
-    logp.beta = sweep(Z1,1,logp.gr1,'*') + sweep(Z2,1,logp.gr2,'*')
-
-    h.fn = Im.H.add(n.beta,Theta,X)
-    h.gr = Im.H.gr.add(n.beta,Theta,X)
-    others = sweep(lambda*h.gr,1,1+lambda*(h.fn-f),'/')
-
-    all = cbind(logq.theta+logr.theta,logp.beta,logr.eta) - others
-
-    res = matrix(0,p,p)
-
-    for(k in 1:2){
-      tmp = all[II[[k]],]
-      tt = as.matrix(scale(tmp,center=TRUE,scale=FALSE))*ns[k]/(ns[k]-1)
-      res = res + t(tt)%*%tt;
-    }
-
-    return(res);
-  }
-
-  V = hess
-  U = score.cov.add(est);
-
-  V.inv = solve(V);
-  cov = (V.inv%*%U)%*%V.inv;
-
-  return(list(est =est,cov =cov,est.log=est.log,cov.log=cov.log,pval.log=pval.log))
-
-}
-
 
 
